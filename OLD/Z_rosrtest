@@ -1,0 +1,173 @@
+#!/usr/bin/expect --
+
+set loguser 0;		#   test 0-quiet, 1=verbose
+log_user $loguser;
+
+		# SETUP FILE DEFINED
+set setupfile  [lindex $argv 0]
+		## SEE IF THE SETUP FILE EXISTS
+if [catch {open $setupfile} sufile] {
+	puts "Setup file open fails, exit 1"
+	exit 1
+}
+
+global ROSR ROSRPID ROSRAV ROSRAVPID
+global infoname
+#========================================================
+		# PROCEDURE TO CONNECT TO ROSR
+#============================================================
+proc SpawnRosr { hub_url rosrport} {
+	global ROSR ROSRPID infoname
+	if {$rosrport == 0} {
+		set ROSRPID [spawn perl simulate/rosr_simulator]
+		set ROSR $spawn_id 
+		write_info $infoname "SPAWN ROSR SIMULATE, spawn_id = $ROSR, pid = $ROSRPID"
+		send_user "ROSR SIMULATE\n"
+	} else {
+		set str [spawn_kermit $hub_url $rosrport]
+		set ROSR [lindex $str 0];    
+		set ROSRPID [lindex $str 1];
+		write_info $infoname "SPAWN ROSR KERMIT, IP=$hub_url, port=$rosrport, spawn_id=$ROSR, pid=$ROSRPID"
+	}
+}
+
+#==========================================
+#   PROCEDURE TO START AVGROSR PROGRAM
+#==========================================
+# proc SpawnAvgRosr { setupfile } {
+# 	global ROSRAV  ROSRAVPID infoname
+# 	set ROSRAVPID [spawn perl avgrosr $setupfile]
+# 	set ROSRAV $spawn_id
+# 	write_info $infoname "SPAWN ROSRAV spawn_id = $ROSRAV,  pid=$ROSRAVPID"
+# 			# WAIT FOR THE STARTUP PROMPT
+# 	set timeout 5
+# 	expect {
+# 				# REPLY FROM AVG PROGRAM
+# 		"avgrosr--" {
+# 			send_user "AVGROSR is ready\n"
+# 		}
+# 	}
+# }
+# 
+#====================================================================
+		# PROCEDURE WRITE_INFO
+		# input
+		#  fname = fullfile name towrite the info string
+		#  str=the string to write
+		# call:
+		# write_info "/tmp/info" "This is a test."
+#=====================================================================
+proc write_info {fname str} {
+	set str [timestamp -gmt -format "%Y%m%dT%H%M%SZ,"]$str
+	exec echo $str >> $fname
+	return $str
+}
+
+#===========================================================================
+# PROCEDURE TO CONNECT TO A PORT USING KERMIT
+# input
+#	serialport = full path name for the serial port, e.g. /dev/tty.usbserial0
+#   baud = desired baud rate, e.g. 9600
+#============================================
+proc spawn_kermit {hub_url portnumber} {
+	global infoname
+			# START PROCESS -- KERMIT
+	set pid [spawn kermit]
+	expect {
+		timeout {send_user "KERMIT FAILS TO OPEN\n"; exit 1}
+		">>"
+	}
+	
+			# OPEN THE PORT
+	send "set host $hub_url $portnumber\r"
+	expect ">>"
+	send "set tcp keepalive on 0\r\n"
+	expect ">>"
+	send "set tcp linger OFF\r\n"
+	expect ">>"
+	send "set tcp nodelay on\r\n"
+	expect ">>"
+	send "set telnet echo local\r\n"
+	expect ">>"
+			# this is important for using the rsr menu
+			# raw means send CR by itself, not CRLF and NOT CRNul
+	send "set telnet newline-mode nvt raw\r\n"
+	expect ">>"
+			# CONNECT 
+	send "connect\r"
+	expect {
+		timeout {send_user "TIMEOUT, NO CONNECT"; exit 1}
+		"Conn*---"  { }  #v15
+	}
+	set out $spawn_id;
+	lappend out $pid
+	return $out
+}
+
+#==================== END PROCEDURES =============================================
+
+exec echo "START ROSR3 [timestamp -gmt -format "%Y%m%d,%H%M%S"]" > /tmp/sbd
+
+spawn -noecho getsetupinfo $setupfile "RT OUT PATH"
+expect -re "(\.*)(\r)";
+set datapath $expect_out(1,string)
+
+	# INFONAME
+set infoname "$env(DAQDATAFOLDER)/info.txt";
+send_user "INFONAME: $infoname\n";
+
+	# PDS SERIAL HUB URL AND OFFSET
+spawn -noecho getsetupinfo $setupfile "SERIAL HUB URL"
+expect -re "(\.*)(\r)";
+set hub_url $expect_out(1,string)
+write_info $infoname  "SERIAL HUB URL: $hub_url"
+
+	## ROSR PORT
+spawn -noecho getsetupinfo $setupfile "ROSR HUB COM NUMBER"
+expect -re "(\.*)(\r)";
+set rosrport $expect_out(1,string)
+write_info $infoname  "ROSR HUB COM NUMBER: $rosrport"
+
+	# OPEN SERIAL PORTS
+SpawnRosr $hub_url $rosrport 
+	# OPEN AVG PROGRAMS
+# SpawnAvgRosr $setupfile 
+
+set timeout 30		;# leave enough time for the scan drum to move
+
+#=================
+# EXPECT LOOP
+#=================
+while 1 {
+	expect { 
+		-i $ROSR 
+		-re "\\\$WIR...*\\*.." {
+			set rawstr [string trimright $expect_out(0,string)]
+			if { [string match {\$WIROS*} $rawstr ] } {
+				set s1 [string first "\$WIROS" $rawstr];
+				set s2 [string first "\*" $rawstr $s1]
+				set str [string range $rawstr $s1 [expr $s2+2]]
+
+				# GPS
+				set gpstr [exec gpsgetraw]
+
+				set str [timestamp -gmt -format "%Y,%m,%d,%H,%M,%S,"]$gpstr,$rawstr 
+				send_user "Z $str\n"; 
+				# SEND TO ROSRAV AND ROSRAV FOR RESPONSE
+			} 
+			if { [string match {*\$WIRAV*} $rawstr ] } {
+				set s1 [string first "\$WIRAV" $rawstr];
+				set s2 [string first "\*" $rawstr $s1]
+				set str [string range $rawstr $s1 [expr $s2+2]]
+				send_user "Z $str\n"; 
+			} 
+			if { [string match {*\$WIRST*} $rawstr ] } {
+				set s1 [string first "\$WIRST" $rawstr];
+				set s2 [string first "\*" $rawstr $s1]
+				set str [string range $rawstr $s1 [expr $s2+2]]
+				send_user "Z $str\n"; 
+			} 
+		}
+	}
+}
+

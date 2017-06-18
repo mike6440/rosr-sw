@@ -1,0 +1,104 @@
+#!/usr/bin/expect --
+
+# === NOTES ======================
+# SEND SCS TO RS232
+# Output log = /tmp/scslog
+# === end ========================
+
+
+# === CRONTAB -E ==================
+#MAILTO=""
+#BASH_ENV="$HOME/.bashrc"
+#SHELL=/bin/bash
+#6,16,26,36,46,56 * * * * $DAQSWFOLDER/sbd2scs_232 >> /tmp/scslog
+#====== END =========================
+
+log_user 0
+
+		# SETUP FILE DEFINED
+set setupfile "$env(HOME)/swmain/apps/ROSR/sw/setup/su.txt"
+		## SEE IF THE SETUP FILE EXISTS
+if [catch {open $setupfile} sufile] {
+	puts "Setup file, $setupfile, open fails, exit 1"
+	exit 1
+}
+
+global SCS SCSPID
+#===================================
+# PROCEDURE TO CONNECT TO SCS  v13
+#===================================
+proc SpawnSCS { hubip scsport }  {
+	global SCS SCSPID
+	set str [spawn_kermit_232 $hubip $scsport]
+	set SCS [lindex $str 0];
+	set SCSPID [lindex $str 1];
+}
+#===========================================================================
+# PROCEDURE TO CONNECT TO A PORT USING KERMIT
+# input
+#	serialport = full path name for the serial port, e.g. /dev/tty.usbserial0
+#   baud = desired baud rate, e.g. 9600
+#============================================
+proc spawn_kermit_232 {hubip portnumber} {
+
+	set inport [exec FindUSBPort]
+	set bd 9600
+	puts "INPUT PORT $inport"
+	puts "INPUT BAUD $bd"
+
+	spawn kermit
+	set timeout 3
+	expect {
+		timeout {"KERMIT FAILS TO OPEN\n"; exit 1}
+		">>"
+	}
+		## OPEN THE PORT
+	send "set line $inport\r"
+	expect ">>"
+		## SPEED
+	send "set speed $bd\r"
+	expect ">>"
+		## DUPLEX
+	send "set duplex full\r"
+	expect ">>"
+		## LOCAL ECHO
+	send "set local-echo on\r"
+	expect ">>"
+		## FLOW CONTROL
+	send "set flow none\r"
+	expect ">>"
+		## CARRIER WATCH
+	send "set carrier-watch off\r"
+	expect ">>"
+		## CONNECT 
+	send "connect\r"
+	expect {
+		"Conn*---"  {send_user "TTY CONNECTED\n"}
+		timeout {send_user "TIMEOUT, NO CONNECT"; exit 1}
+	}
+	expect {
+		timeout {send_user "TIMEOUT, NO CONNECT"; exit 1}
+		"Conn*---"  { }  #v15
+	}
+	send_user "spawn_kermit_232 spawn_id = $spawn_id,   pid = $pid\n";
+	set out $spawn_id;
+	lappend out $pid
+	return $out
+}
+#==================== END PROCEDURES =============================================
+
+
+#  Open SCS: ==>> $SCS and $SCSPID
+# SpawnSCS $hubip $scsport
+
+		#=====================
+		# SEND SIGNON MESSAGE
+		#====================
+set scsmessage [ exec head -1 /tmp/sbd ]
+
+if { $scsport >= 0 } { 
+	# send -i $SCS $scsmessage;
+	send_user "SCS message: $scsmessage\n";
+}
+
+exit;
