@@ -1,3 +1,4 @@
+edit 20170619T002925Z
 THIS FILE: su_rosr3_spurs.txt
 Editdate: 160718
 ROSR SERIAL NUMBER: 3
