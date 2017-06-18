@@ -8,7 +8,7 @@ alias ll="ls -l"
 
 #  		ISAR S/N 
 export ROSRSN="01";
-export DAQFOLDER="$HOME/swmain/apps/ROSR"
+export DAQFOLDER="$DAQPATH/ROSR"
 export DAQSWFOLDER="$DAQFOLDER/sw"
 export DAQDATAFOLDER="$DAQFOLDER/data"
 alias gtdaq="cd $DAQSWFOLDER"
