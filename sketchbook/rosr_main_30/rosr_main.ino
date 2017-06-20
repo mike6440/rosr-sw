@@ -4,9 +4,9 @@
 //variable space.
 
 #define PROGRAMNAME "rosr_main"
-#define VERSION     "31"//
-#define EDITDATE    "170620" //"160812" spurs2
-const byte  EEPROM_ID = 15;
+#define VERSION     "30"//
+#define EDITDATE    "161222" //"160812" spurs2
+const byte  EEPROM_ID = 14;
 
 //v23 - ComputeSSST had issues. No more!
 //v24 - Added calibrated therm coefs for ROSR2
@@ -16,9 +16,6 @@ const byte  EEPROM_ID = 15;
 //v28 - See !! Revise thermistor coefficient subroutine for rosr3. New BB table for kt15.
 //v29 - TMAX is too low. change from 50 to 70.  Add pitch_correct and roll_correct to eeprom
 //v30 - ready for improvement.
-//v31 -   tilt reversed multiply pitch and roll by -1 (or other)
-//        eeprom and revised menu
-
 
 //NOTE ====== INCLUDES
 #include <string.h>

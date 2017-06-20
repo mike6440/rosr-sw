@@ -11,6 +11,7 @@ alias ll="ls -l"
 export ROSRSN="01";
 # color 
 export LSCOLORS="cxfxcxdxfxegedabagacad"
+alias ls="ls -aG"
 # folders
 export DAQFOLDER="$DAQPATH/ROSR"
 export DAQSWFOLDER="$DAQFOLDER/sw"
