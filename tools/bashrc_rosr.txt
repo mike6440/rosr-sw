@@ -9,7 +9,9 @@ alias ll="ls -l"
 
 #  		ROSR S/N 
 export ROSRSN="01";
-
+# color 
+export LSCOLORS="cxfxcxdxfxegedabagacad"
+# folders
 export DAQFOLDER="$DAQPATH/ROSR"
 export DAQSWFOLDER="$DAQFOLDER/sw"
 export DAQDATAFOLDER="$DAQFOLDER/data"
