@@ -228,6 +228,7 @@ const byte default_Nocean = 40;
 const float default_rain_threshold = .090;
 const char default_shutter = 1;
 const unsigned long default_rainsecs = 600;
+const byte default_tiltrev = 0;  //v31 0->micro50 forward, 1->micro50 reversed
 const float default_pitch_correct = 0; //v29
 const float default_roll_correct = 0;  //v29
 const char default_bbheat[2] = {
@@ -268,7 +269,7 @@ const float SCAN_TOLERANCE = .1;
 
 
 struct eeprom {
-  byte id, Nbb, Nsky, Nocean, ShutterFlag, CalFlag;
+  byte id, Nbb, Nsky, Nocean, ShutterFlag, CalFlag, tiltrev;
   float abb1, abb2, aocean, asky, encoderref, rain_threshold, ScanTolerance;
   float pitch_correct, roll_correct; //v29
   unsigned long rainsecs;
@@ -877,21 +878,21 @@ void    Action(char *cmd)
   // TAKE ACTION AND PREPARE AN OUTPUT MESSAGE IN out_message
   if (cmd[0] == '?') {
     PrintProgramID();
-    Serial.println("------- EEPROM -----------------------------------");
-    Serial.println("E       -- show eeprom ");
-    Serial.println("Ecfff.f -- BB1 point angle          ECfff.f -- BB2 point angle");
-    Serial.println("EHnn    -- set bb1 and bb2 heater, 0/1 = off,on.  Standard=01");
-    Serial.println("Epfff.f -- SKY point angle          EPfff.f -- OCEAN point angle");
-    Serial.println("EFfff.f -- Encoder Scan Tolerance");
-    Serial.println("EBnn    -- Black body sample count  EMn     -- Shutter motor on=1, disable=0");
-    Serial.println("EUnn    -- SKY sample count         ETnn    -- OCEAN (target) count");
-    Serial.println("EDfff.f -- Drum zero ref            EEn     -- MODE: 0=Run, 1=Cal");
-    Serial.println("ERfff.f -- Rain threshold volts     Ernn    -- Shutter open delay, nn secs");
-    Serial.println("Egfff.f -- Cal slope Acorr          EGfff.f -- Cal offset, degC");
-    Serial.println("EAnff.f -- Ref R[n] = fff.f ohms    Ehfff.f -- BB Emissivity");
-    Serial.println("Ejff.f  -- Pitch correct deg        EJff.f  -- Roll correct deg");
-    Serial.println("");
-    Serial.println("------- FUNCTIONS -----------------------------------");
+//     Serial.println("------- EEPROM -----------------------------------");
+//     Serial.println("E       -- show eeprom ");
+//     Serial.println("Ecfff.f -- BB1 point angle          ECfff.f -- BB2 point angle");
+//     Serial.println("EHnn    -- set bb1 and bb2 heater, 0/1 = off,on.  Standard=01");
+//     Serial.println("Epfff.f -- SKY point angle          EPfff.f -- OCEAN point angle");
+//     Serial.println("EFfff.f -- Encoder Scan Tolerance");
+//     Serial.println("EBnn    -- Black body sample count  EMn     -- Shutter motor on=1, disable=0");
+//     Serial.println("EUnn    -- SKY sample count         ETnn    -- OCEAN (target) count");
+//     Serial.println("EDfff.f -- Drum zero ref            EEn     -- MODE: 0=Run, 1=Cal");
+//     Serial.println("ERfff.f -- Rain threshold volts     Ernn    -- Shutter open delay, nn secs");
+//     Serial.println("Egfff.f -- Cal slope Acorr          EGfff.f -- Cal offset, degC");
+//     Serial.println("EAnff.f -- Ref R[n] = fff.f ohms    Ehfff.f -- BB Emissivity");
+//     Serial.println("Ejff.f  -- Pitch correct deg        EJff.f  -- Roll correct deg");
+//     Serial.println("");
+//     Serial.println("------- FUNCTIONS -----------------------------------");
     Serial.println("an -- ADC Chan n                    A      -- ADC all loop");
     Serial.println("bn -- BB n heater OFF               Bn     -- BB n heater ON");
     Serial.println("c  -- 5REF OFF                      C      -- 5REF ON");
@@ -899,7 +900,7 @@ void    Action(char *cmd)
     Serial.println("Dff.f   -- Set the encoder to ff.f");
     Serial.println("fo   -- Shutter Open (CCW)          fc    -- Shutter Close (CW)");
     Serial.println("F    -- Shutter 20x or keystroke");
-    Serial.println("h    -- HE switches                 H     -- HE loop");
+    Serial.println("h/H  -- HE switches loop");
     Serial.println("k    -- KT15 RAD                    K     -- KT15 loop");
     Serial.println("l    -- Send KT15 command ");
     Serial.println("m    -- Drum motor CCW              M     -- Drum motor CW");
@@ -923,11 +924,13 @@ void    Action(char *cmd)
       Serial.println("Error");
     }
     else {
-      GetAdcSample(ix, (vmean + ix));
-      Serial.print("Chan ");
-      Serial.print(ix, DEC);
-      Serial.print("  ");
-      Serial.println(vmean[ix], 4);
+    	while ( !Serial.available()  ) {
+		  GetAdcSample(ix, (vmean + ix));
+		  Serial.print("Chan ");
+		  Serial.print(ix, DEC);
+		  Serial.print("  ");
+		  Serial.println(vmean[ix], 4);
+		}
     }
   }
   // ADC LOOP
@@ -1363,6 +1366,14 @@ void    Action(char *cmd)
         Serial.print("Shutter on/off = ");
         Serial.println(ix);
         ee.ShutterFlag = ix;
+        eok = 1;
+      }
+      else if ( cmd[1] == 't'  ) {
+        ix = atoi(cmd + 2);
+        if(ix>0)ix=1;
+        Serial.print("Tilt reversed flag = ");
+        Serial.println(ix);
+        ee.tiltrev = ix;
         eok = 1;
       }
       if ( eok == 1 ) {
@@ -1826,6 +1837,7 @@ void EepromDefault() {
   ee.pb2t[1] = default_pb2t[1];
   ee.pb2t[2] = default_pb2t[2];
   ee.pb2t[3] = default_pb2t[3];
+  ee.tiltrev = default_tiltrev;
   ee.ScanTolerance = SCAN_TOLERANCE;
   ee.Acorr = default_Acorr;
   ee.Offset = default_Offset;
@@ -1886,6 +1898,7 @@ void EepromPrint()
   Serial.print(ee.abb1, 2);
   Serial.println(" deg");
   Serial.print("  C BB2 angle = ");
+  \\\\\\\
   Serial.print(ee.abb2, 2);
   Serial.println(" deg");
   Serial.print("  p sky angle = ");
@@ -1928,6 +1941,9 @@ void EepromPrint()
   Serial.println("");
   Serial.print("  h BB Emis = ");
   Serial.print(ee.ebb, 5);
+  Serial.println("");
+  Serial.print("  t Tilt Rev Flag = "); //v31
+  Serial.print(ee.tiltrev);  //v31
   Serial.println("");
   Serial.print("  j pitch correct = "); //v29
   Serial.print(ee.pitch_correct, 1);  //v29
@@ -2755,6 +2771,7 @@ void        ReadTilt(double *pitch, double *roll)
     if (ddum < -1660) ddum = -1660;
     if (ddum > 1660) ddum = 1660;
     *pitch = P1 * (C1 * ddum + C2 * ddum * ddum + C3 * ddum * ddum * ddum) + P0 + ee.pitch_correct;  //v29
+    if(ee.tiltrev==1) *pitch *= -1;
   }
   else *pitch = MISSING;
   //  Serial.print("Pitch = "); Serial.println(*pitch,1);
@@ -2781,6 +2798,7 @@ void        ReadTilt(double *pitch, double *roll)
     if (ddum < -1660) ddum = -1660;
     if (ddum > 1660) ddum = 1660;
     *roll = R1 * (C1 * ddum + C2 * ddum * ddum + C3 * ddum * ddum * ddum) + R0 + ee.roll_correct; //v29
+    if(ee.tiltrev==1) *roll *= -1;
   }
   else *roll = MISSING;
   //  Serial.print("Roll = "); Serial.println(*roll,1);
