@@ -5,7 +5,7 @@
 
 #define PROGRAMNAME "rosr_main"
 #define VERSION     "31"//
-#define EDITDATE    "170620" //"160812" spurs2
+#define EDITDATE    "20170621T023616Z" //"160812" spurs2
 const byte  EEPROM_ID = 15;
 
 //v23 - ComputeSSST had issues. No more!
@@ -896,15 +896,16 @@ void    Action(char *cmd)
     Serial.println("an -- ADC Chan n                    A      -- ADC all loop");
     Serial.println("bn -- BB n heater OFF               Bn     -- BB n heater ON");
     Serial.println("c  -- 5REF OFF                      C      -- 5REF ON");
-    Serial.println("d[ff.f] -- Point to angle f.f,      Omit f.f for current position");
-    Serial.println("Dff.f   -- Set the encoder to ff.f");
+    Serial.println("d    -- encoder loop");
+    Serial.println("df.f -- Point to angle f.f");
+    Serial.println("Df.f -- Set the encoder to f.f");
     Serial.println("fo   -- Shutter Open (CCW)          fc    -- Shutter Close (CW)");
     Serial.println("F    -- Shutter 20x or keystroke");
     Serial.println("h/H  -- HE switches loop");
     Serial.println("k    -- KT15 RAD                    K     -- KT15 loop");
     Serial.println("l    -- Send KT15 command ");
     Serial.println("m    -- Drum motor CCW              M     -- Drum motor CW");
-    Serial.println("p    -- pitch/roll single           P     -- pitch/roll loop");
+    Serial.println("p    -- pitch/roll loop");
     Serial.println("r    -- Rain check single           R     -- Rain check loop");
     Serial.println("t    -- Read system clock           T     -- Set default f.p. day");
     Serial.println("sn   -- LED test:  1=Heartbeat   2=Drum   3=Shutter/Rain");
@@ -1084,17 +1085,27 @@ void    Action(char *cmd)
 
   // POINT SCAN DRUM
   else if (cmd[0] == 'd') {
-    EncoderAngle = ReadEncoder(ee.encoderref);
-    Serial.print("Drum = ");
-    Serial.print(EncoderAngle, 2);
-    Serial.println(" deg");
-    if (strlen(cmd) > 1) {
-      ddum = atof(cmd + 1);
-      Serial.print("Request ");
-      Serial.println(ddum, 2);
-      EncoderAngle = PointScanDrum(ddum);
-      Serial.print("Final EncoderAngle = ");
-      Serial.println(EncoderAngle, 2);
+  	if(strlen(cmd) == 1){
+    	while ( !Serial.available()  ) {
+			EncoderAngle = ReadEncoder(ee.encoderref);
+			Serial.print("Drum = ");
+			Serial.print(EncoderAngle, 2);
+			Serial.println(" deg");
+			delay(2000);
+		}
+    } else {
+    	// Read current position
+		EncoderAngle = ReadEncoder(ee.encoderref);
+		Serial.print("Drum = ");
+		Serial.print(EncoderAngle, 2);
+		Serial.println(" deg");
+		//Point the drum
+		ddum = atof(cmd + 1);
+		Serial.print("Request ");
+		Serial.println(ddum, 2);
+		EncoderAngle = PointScanDrum(ddum);
+		Serial.print("Final EncoderAngle = ");
+		Serial.println(EncoderAngle, 2);
    	}
   }
   else if (cmd[0] == 'D' && strlen(cmd) > 1) {
@@ -1400,13 +1411,6 @@ void    Action(char *cmd)
   }
   // PITCH/ROLL
   else if (cmd[0] == 'p') {
-    ReadTilt(&ddum, &fdum);
-    Serial.print("pitch = ");
-    Serial.print(ddum, 2);
-    Serial.print("    roll = ");
-    Serial.println(fdum, 2);
-  }
-  else if (cmd[0] == 'P') {
     Serial.println(" N  PITCH  ROLL");
     ix = 0;
     while (! Serial.available()) {
@@ -1417,7 +1421,7 @@ void    Action(char *cmd)
       Serial.print(ddum, 2);
       Serial.print("  ");
       Serial.println(fdum, 2);
-      delay(1000);
+      delay(2000);
       ix++;
     }
   }
@@ -1898,7 +1902,6 @@ void EepromPrint()
   Serial.print(ee.abb1, 2);
   Serial.println(" deg");
   Serial.print("  C BB2 angle = ");
-  \\\\\\\
   Serial.print(ee.abb2, 2);
   Serial.println(" deg");
   Serial.print("  p sky angle = ");
